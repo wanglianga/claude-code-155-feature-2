@@ -12,6 +12,7 @@ const alerts = computed(() => data.renewalAlerts)
 const tickets = computed(() => data.openTickets)
 const leaves = computed(() => data.pendingLeaves)
 const complaints = computed(() => data.openComplaints)
+const transfers = computed(() => data.openTransfers)
 
 const behindMembers = computed(() =>
   data.packages
@@ -110,6 +111,37 @@ function decideLeave(id: string, ok: boolean) {
         </div>
         <div v-if="!complaints.length" class="empty">暂无投诉</div>
       </div>
+    </div>
+
+    <!-- 转教练试运行跟踪 -->
+    <div class="card">
+      <div class="between">
+        <h3 style="margin: 0">转教练试运行跟踪（{{ transfers.length }}）</h3>
+        <router-link to="/consultant/transfers"><button class="small ghost">全部交接 →</button></router-link>
+      </div>
+      <table v-if="transfers.length" class="plain mt8">
+        <thead><tr><th>会员</th><th>教练变更</th><th>阶段</th><th>会员满意度</th><th>新教练反馈</th><th></th></tr></thead>
+        <tbody>
+          <tr v-for="t in transfers" :key="t.id">
+            <td><b>{{ data.nameOf(t.memberId) }}</b></td>
+            <td>{{ data.coachById(t.fromCoachId)?.name }} → {{ data.coachById(t.toCoachId)?.name }}</td>
+            <td><span class="tag" :class="t.status === '待顾问决定' ? 'amber' : 'clay'">{{ t.status }}</span></td>
+            <td>
+              <template v-if="t.satisfactions.length">
+                <span :style="{ color: t.satisfactions[0].score <= 2 ? 'var(--danger)' : 'inherit' }">{{ t.satisfactions[0].score }}/5</span>
+                <span class="muted">（{{ t.satisfactions.length }} 次）</span>
+              </template>
+              <span v-else class="muted">未打卡</span>
+            </td>
+            <td>
+              <span v-if="t.adaptFeedback" class="tag" :class="t.adaptFeedback.fitness === '不适配' ? 'danger' : ''">{{ t.adaptFeedback.fitness }}</span>
+              <span v-else class="muted">待首课反馈</span>
+            </td>
+            <td><router-link :to="`/consultant/transfer/${t.id}`"><button class="small">跟踪处理</button></router-link></td>
+          </tr>
+        </tbody>
+      </table>
+      <div v-else class="empty">暂无进行中的转教练流程</div>
     </div>
 
     <!-- 异常工单 -->

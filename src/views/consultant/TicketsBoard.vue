@@ -12,7 +12,6 @@ const open = computed(() => data.tickets.filter(t => t.status !== '已解决'))
 const done = computed(() => data.tickets.filter(t => t.status === '已解决'))
 
 const resolutions = reactive<Record<string, string>>({})
-const newCoach = reactive<Record<string, string>>({})
 const reDate = reactive<Record<string, string>>({})
 const reTime = reactive<Record<string, string>>({})
 
@@ -25,12 +24,6 @@ function resolve(t: Ticket) {
   const r = resolutions[t.id]?.trim()
   if (!r) { alert('请填写处理结论（将写入会员训练记录）'); return }
   data.resolveTicket(t.id, r, myName)
-}
-
-function doAssignCoach(t: Ticket) {
-  const c = newCoach[t.id]
-  if (!c) { alert('请选择新教练'); return }
-  data.assignNewCoach(t.id, c, myName)
 }
 
 function doReschedule(t: Ticket) {
@@ -69,15 +62,17 @@ function sessionOf(t: Ticket) {
         </span>
       </div>
 
-      <!-- 更换教练：选择新教练，记录完整交接 -->
+      <!-- 更换教练：走转教练交接流程（整理资料 → 新教练确认 → 试运行 → 顾问决定） -->
       <div v-if="t.type === '更换教练'" class="row mb8">
-        <select v-model="newCoach[t.id]" style="width: 280px">
-          <option value="" disabled>选择新教练（历史记录将完整交接）</option>
-          <option v-for="c in data.coaches.filter(c => c.id !== t.coachId)" :key="c.id" :value="c.id">
-            {{ c.name }}（{{ c.gender }} · {{ c.specialties.join('/') }}）
-          </option>
-        </select>
-        <button class="small" @click="doAssignCoach(t)">确认更换</button>
+        <template v-if="data.activeTransferOf(t.memberId)">
+          <span class="tag clay">交接{{ data.activeTransferOf(t.memberId)!.status }}</span>
+          <router-link :to="`/consultant/transfer/${data.activeTransferOf(t.memberId)!.id}`">
+            <button class="small">跟踪转教练交接 →</button>
+          </router-link>
+        </template>
+        <router-link v-else :to="`/consultant/transfer/new/${t.memberId}?ticket=${t.id}`">
+          <button class="small">发起转教练交接（自动整理训练目标 / 课后记录 / 疼痛变化 / 会员偏好）→</button>
+        </router-link>
       </div>
 
       <!-- 教练请假：直接改期受影响课程（含已批准请假后的补课） -->

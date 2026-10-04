@@ -15,6 +15,7 @@ const myLeaves = computed(() => data.leaves.filter(l => {
   return s?.memberId === mid
 }))
 const pkg = computed(() => data.activePackage(mid))
+const activeTransfer = computed(() => data.activeTransferOf(mid))
 
 const tab = ref<'leave' | 'reschedule' | 'pain' | 'coach' | 'complaint'>('leave')
 
@@ -157,11 +158,14 @@ const tabs = [
     <div v-if="tab === 'coach'" class="card">
       <h3>申请换教练</h3>
       <p class="muted">你的测评档案、全部课后记录与疼痛趋势会完整交接给新教练，不需要从零开始沟通。</p>
+      <div v-if="activeTransfer" class="banner warn">
+        转教练流程进行中（{{ activeTransfer.status }}），进度与满意度打卡请见「我的主页」。
+      </div>
       <div class="form-row">
         <label>申请原因</label>
         <textarea v-model="coachReason" placeholder="如：希望更换为女教练 / 沟通风格不适应"></textarea>
       </div>
-      <button @click="submitCoachChange">提交申请</button>
+      <button :disabled="!!activeTransfer" @click="submitCoachChange">提交申请</button>
     </div>
 
     <!-- 投诉 -->

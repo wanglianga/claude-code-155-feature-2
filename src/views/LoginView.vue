@@ -23,7 +23,7 @@ const roleLabel: Record<Role, string> = { member: '会员', coach: '教练', con
 const roleDesc: Record<Role, string> = {
   member: '预约体验课 / 查看课表课包 / 请假改期 / 不适上报',
   coach: '周课表 / 体验测评 / 课后记录 / 课程调整',
-  consultant: '转化看板 / 安排体验课 / 异常工单 / 续费跟进',
+  consultant: '转化看板 / 安排体验课 / 异常工单 / 续费与转教练',
 }
 
 function login() {

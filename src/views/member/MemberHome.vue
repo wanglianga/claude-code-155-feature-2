@@ -4,6 +4,7 @@ import { useAuthStore } from '../../stores/auth'
 import { useDataStore } from '../../stores/data'
 import PackageCard from '../../components/PackageCard.vue'
 import ProfessionalProfile from '../../components/ProfessionalProfile.vue'
+import TransferSteps from '../../components/TransferSteps.vue'
 import { weekdayCn } from '../../utils/date'
 
 const auth = useAuthStore()
@@ -15,6 +16,35 @@ const upcoming = computed(() => data.upcomingSessions(mid))
 const booking = computed(() => data.bookingOf(mid))
 const assessment = computed(() => data.latestAssessment(mid))
 const prog = computed(() => pkg.value ? data.progressOf(pkg.value) : null)
+
+// ---- 转教练交接 ----
+const transfer = computed(() => data.activeTransferOf(mid))
+const lastClosedTransfer = computed(() =>
+  data.transfersOf(mid).find(t => t.status === '已稳定转入' || t.status === '已结束-不适配'),
+)
+const sat = reactive({ score: 4, note: '' })
+const noteText = ref('')
+const transferMsg = ref('')
+
+function flashTransfer(t: string) {
+  transferMsg.value = t
+  setTimeout(() => (transferMsg.value = ''), 2500)
+}
+
+function submitSatisfaction() {
+  if (!transfer.value) return
+  data.submitSatisfaction(transfer.value.id, sat.score, sat.note.trim(), auth.current!.name)
+  sat.note = ''
+  flashTransfer('满意度已提交，顾问会持续跟踪试运行情况')
+}
+
+function addTransferNote() {
+  if (!transfer.value || !noteText.value.trim()) return
+  data.addTransferNote(transfer.value.id, 'member', mid, noteText.value.trim())
+  noteText.value = ''
+}
+
+const roleLabel: Record<string, string> = { member: '会员', coach: '教练', consultant: '顾问' }
 
 // ---- 确认购课 ----
 const showPurchase = ref(false)
@@ -50,6 +80,47 @@ const expSession = computed(() => upcoming.value.find(s => s.isExperience))
     </div>
     <div v-if="prog?.behind" class="banner warn">
       📉 课消进度落后：按当前上课频率，课包到期前可能上不完，建议与顾问协商加课或调整排课。
+    </div>
+
+    <!-- 转教练交接进行中 -->
+    <div v-if="transfer" class="card" style="border-color: var(--clay)">
+      <h3>🔄 转教练进行中：{{ data.coachById(transfer.fromCoachId)?.name }} → {{ data.coachById(transfer.toCoachId)?.name }}</h3>
+      <TransferSteps :status="transfer.status" />
+      <div v-if="transferMsg" class="banner warn mt8" style="margin-bottom: 0">{{ transferMsg }}</div>
+      <p class="muted mt8">
+        <template v-if="transfer.status === '待新教练确认'">顾问已整理你的训练目标、课后记录与偏好，等待 {{ data.coachById(transfer.toCoachId)?.name }} 教练阅读确认后接手。</template>
+        <template v-else-if="transfer.status === '试运行中'">新教练已接手，目前为试运行阶段——你的训练记录已完整交接，无需从零开始。</template>
+        <template v-else-if="transfer.status === '待顾问决定'">新教练已提交首课适配反馈，顾问将结合你的满意度决定是否稳定转入。</template>
+      </p>
+
+      <!-- 试运行满意度打卡 -->
+      <div v-if="transfer.status === '试运行中' || transfer.status === '待顾问决定'" class="mt8">
+        <label>对新教练的满意度（可多次打卡，顾问会持续跟踪）：{{ sat.score }}/5</label>
+        <div class="row">
+          <input v-model.number="sat.score" type="range" min="1" max="5" style="max-width: 220px" />
+          <input v-model="sat.note" placeholder="说说感受，如：节奏合适 / 强度还是偏大" style="flex: 1" />
+          <button class="small" @click="submitSatisfaction">提交满意度</button>
+        </div>
+      </div>
+
+      <!-- 双方沟通记录 -->
+      <div v-if="transfer.notes.length" class="mt16">
+        <label>沟通记录</label>
+        <div v-for="n in transfer.notes" :key="n.id" class="note-item">
+          <div class="note-head">{{ n.at }} · {{ n.byName }}（{{ roleLabel[n.byRole] }}）</div>
+          <div style="font-size: 14px">{{ n.content }}</div>
+        </div>
+      </div>
+      <div class="row mt8">
+        <input v-model="noteText" placeholder="给顾问 / 教练留言（沟通记录会保留在交接档案中）" style="flex: 1" @keyup.enter="addTransferNote" />
+        <button class="small ghost" @click="addTransferNote">留言</button>
+      </div>
+    </div>
+
+    <!-- 最近一次转教练结果 -->
+    <div v-else-if="lastClosedTransfer" class="banner" :class="lastClosedTransfer.status === '已稳定转入' ? 'warn' : 'danger'">
+      🔄 转教练{{ lastClosedTransfer.decision?.result === '稳定转入' ? '已稳定转入' : `已按「${lastClosedTransfer.decision?.result}」处理` }}：
+      {{ lastClosedTransfer.decision?.note }}
     </div>
 
     <!-- 体验课流程状态 -->

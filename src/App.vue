@@ -25,6 +25,7 @@ const navs = computed(() => {
       { to: '/consultant', label: '经营看板' },
       { to: '/consultant/arrange', label: '安排体验课' },
       { to: '/consultant/tickets', label: '异常工单' },
+      { to: '/consultant/transfers', label: '转教练交接' },
     ]
   }
   return []

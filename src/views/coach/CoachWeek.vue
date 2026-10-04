@@ -27,6 +27,19 @@ const weekDays = computed(() => {
 
 const mySessions = computed(() => data.coachSessions(coachId))
 
+// 转教练交接收件箱：待我确认 / 试运行中待我反馈
+const transferInbox = computed(() => data.coachTransferInbox(coachId))
+
+function transferHint(t: (typeof transferInbox.value)[number]): string {
+  if (t.status === '待新教练确认') return '待你阅读交接记录并确认接手'
+  if (t.status === '试运行中') {
+    const first = t.firstSessionId ? data.sessions.find(s => s.id === t.firstSessionId) : undefined
+    if (first?.status === '已完成' && !t.adaptFeedback) return '首课已完成，请填写适配反馈'
+    return '试运行中，首课结束后请填写适配反馈'
+  }
+  return '适配反馈已提交，等待顾问决定'
+}
+
 function sessionsOn(date: string): Session[] {
   return mySessions.value.filter(s => s.date === date)
 }
@@ -74,6 +87,22 @@ const statusClass: Record<string, string> = { 待上课: '', 已完成: 'off', �
         <button class="ghost small" @click="weekOffset--">← 上一周</button>
         <button class="ghost small" @click="weekOffset = 0">本周</button>
         <button class="ghost small" @click="weekOffset++">下一周 →</button>
+      </div>
+    </div>
+
+    <!-- 转教练交接 -->
+    <div v-if="transferInbox.length" class="card" style="border-color: var(--clay)">
+      <h3>🔄 转教练交接（{{ transferInbox.length }}）</h3>
+      <div v-for="t in transferInbox" :key="t.id" class="between mb8" style="border-bottom: 1px dashed var(--line); padding-bottom: 8px">
+        <div>
+          <b>{{ data.nameOf(t.memberId) }}</b>
+          <span class="muted">{{ data.coachById(t.fromCoachId)?.name }} → 你</span>
+          <span class="tag clay">{{ t.status }}</span>
+          <div class="muted">{{ transferHint(t) }}</div>
+        </div>
+        <router-link :to="`/coach/transfer/${t.id}`">
+          <button class="small">{{ t.status === '待新教练确认' ? '阅读交接并确认 →' : '查看交接 →' }}</button>
+        </router-link>
       </div>
     </div>
 

@@ -1,5 +1,5 @@
 import type {
-  Account, Assessment, CoachProfile, Complaint, CoursePackage, ExperienceBooking,
+  Account, Assessment, CoachProfile, CoachTransfer, Complaint, CoursePackage, ExperienceBooking,
   LeaveRequest, RenewalFollowUp, SchedulePlan, Session, SessionRecord, Ticket, TimelineEvent,
 } from '../types'
 import { addDays, daysAgo, nowStr, today, weekdayCn } from '../utils/date'
@@ -18,6 +18,7 @@ export interface SeedState {
   renewals: RenewalFollowUp[]
   complaints: Complaint[]
   timeline: TimelineEvent[]
+  transfers: CoachTransfer[]
 }
 
 // 固定 ID，便于测试账号与演示脚本引用
@@ -227,7 +228,7 @@ export function buildSeed(): SeedState {
     { id: 'tk_knee', type: '会员不适', memberId: IDS.mWang, coachId: IDS.coachLin, title: '右膝疼痛反复', detail: '会员反馈：上节课后第二天右膝外侧疼痛回到 5 分，上下楼明显，希望调整训练强度。', createdAt: daysAgo(9), status: '处理中', resolution: '' },
     { id: 'tk_progress', type: '进度落后', memberId: IDS.mWang, coachId: IDS.coachLin, title: '课消进度落后', detail: '课包已过半程，24 节仅消耗 6 节（含 1 次请假），按当前频率到期前无法上完。', createdAt: daysAgo(3), status: '待处理', resolution: '' },
     { id: 'tk_coach_leave', type: '教练请假', memberId: IDS.mHe, coachId: IDS.coachZhou, sessionId: 'ss_he_n1', title: '周远教练周四请假', detail: '教练请假 1 天，何静周四 19:00 课程需要改期或换教练代课。', createdAt: daysAgo(1), status: '待处理', resolution: '' },
-    { id: 'tk_change_coach', type: '更换教练', memberId: IDS.mSun, coachId: IDS.coachZhou, title: '孙悦申请更换教练', detail: '会员反馈课程强度偏大、沟通节奏不适应，希望更换为女教练。', createdAt: daysAgo(2), status: '待处理', resolution: '' },
+    { id: 'tk_change_coach', type: '更换教练', memberId: IDS.mSun, coachId: IDS.coachZhou, title: '孙悦申请更换教练', detail: '会员反馈课程强度偏大、沟通节奏不适应，希望更换为女教练。', createdAt: daysAgo(2), status: '处理中', resolution: '' },
     { id: 'tk_expire', type: '课包到期', memberId: IDS.mZhao, coachId: IDS.coachZhou, title: '赵磊课包 10 天后到期', detail: '课包剩余 3 节，到期日前最多再上 2 节，需尽快沟通续费或延期。', createdAt: daysAgo(2), status: '处理中', resolution: '' },
     { id: 'tk_reschedule_done', type: '临时改期', memberId: IDS.mWang, coachId: IDS.coachLin, sessionId: 'ss_wang_4', title: '临时改期（已处理示例）', detail: '会员临时加班，申请将课程从 18:00 改到 19:00。', createdAt: daysAgo(25), status: '已解决', resolution: '顾问协调教练档期，课程顺延至当天 19:00，未计请假。' },
   ]
@@ -262,9 +263,28 @@ export function buildSeed(): SeedState {
     { id: 'tl_16', memberId: IDS.mHe, at: daysAgo(3), kind: '投诉', actorRole: 'member', actorName: '何静', title: '提交投诉', detail: '晚间时段总是约满，希望增加排课选择。' },
     { id: 'tl_17', memberId: IDS.mHe, at: daysAgo(1), kind: '请假', actorRole: 'coach', actorName: '周远', title: '教练请假', detail: '周远教练周四请假，何静 ' + addDays(t, 4) + ' 19:00 课程待协调。' },
     { id: 'tl_18', memberId: IDS.mLi, at: daysAgo(1), kind: '预约体验', actorRole: 'member', actorName: '李敏', title: '预约体验课', detail: '偶尔运动；肩颈 4 分；目标：体态矫正、减压助眠；介意异性教练。' },
+    { id: 'tl_19', memberId: IDS.mSun, at: daysAgo(1), kind: '更换教练', actorRole: 'consultant', actorName: '陈曦', title: '发起转教练交接', detail: '顾问整理训练目标、3 条课后记录、疼痛变化与会员偏好，发起转教练流程：周远 → 苏晴；待新教练阅读确认后进入试运行。' },
   ]
 
-  return { accounts, coaches, bookings, assessments, packages, plans, sessions, records, leaves, tickets, renewals, complaints, timeline }
+  // ---------- 转教练交接 ----------
+  const transfers: CoachTransfer[] = [
+    {
+      id: 'tr_sun', memberId: IDS.mSun, fromCoachId: IDS.coachZhou, toCoachId: IDS.coachSu,
+      consultantId: IDS.consultant, ticketId: 'tk_change_coach', createdAt: daysAgo(1),
+      reason: '会员反馈课程强度偏大、沟通节奏不适应，希望更换为女教练（来自换教练申请）。',
+      goals: ['力量提升'],
+      preference: '希望女教练；沟通节奏放缓、强度循序渐进；周三 20:00-21:00 时段方便。',
+      complaintSummary: '无正式投诉；换教练申请中提到「强度偏大、沟通节奏不适应」，上节课体感 7/10 偏吃力。',
+      handoverNote: '已完成 3 节力量基础课，深蹲模式刚建立、上肢拉力刚入门；会员本体感觉一般，建议前 2 周以动作质量为主，避免大强度间歇，多讲解少催促。',
+      status: '待新教练确认',
+      satisfactions: [],
+      notes: [
+        { id: 'tn_sun_1', at: daysAgo(1) + ' 18:30', byRole: 'consultant', byName: '陈曦', content: '已与会员电话确认：同意先随新教练试 2 节课再决定是否稳定转入，会员希望首节课强度降下来。' },
+      ],
+    },
+  ]
+
+  return { accounts, coaches, bookings, assessments, packages, plans, sessions, records, leaves, tickets, renewals, complaints, timeline, transfers }
 }
 
-export const SEED_VERSION = 3
+export const SEED_VERSION = 4

@@ -184,3 +184,30 @@ table.plain th { color: var(--muted); font-weight: 500; font-size: 12px; }
 .pain-dots { display: inline-flex; gap: 3px; }
 .pain-dots i { width: 10px; height: 10px; border-radius: 3px; background: #eeece8; }
 .pain-dots i.on { background: var(--clay); }
+
+/* 转教练流程步骤条 */
+.steps { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.step {
+  font-size: 12px; padding: 3px 12px; border-radius: 999px;
+  background: #eeece8; color: var(--muted); white-space: nowrap;
+}
+.step.on { background: var(--amber-soft); color: var(--amber); font-weight: 600; box-shadow: 0 0 0 1px #e8d9b8; }
+.step.done { background: var(--sage-soft); color: var(--sage-deep); font-weight: 600; }
+.step.bad { background: var(--danger-soft); color: var(--danger); font-weight: 600; }
+.step-arrow { color: var(--line); font-size: 12px; }
+
+/* 沟通记录线程 */
+.note-item { border-bottom: 1px dashed var(--line); padding: 8px 0; font-size: 14px; }
+.note-item:last-child { border-bottom: none; }
+.note-head { font-size: 12px; color: var(--muted); margin-bottom: 2px; }
+
+/* 决定选项卡 */
+.decide-opts { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 12px; }
+@media (max-width: 860px) { .decide-opts { grid-template-columns: repeat(2, 1fr); } }
+.decide-opt {
+  border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px;
+  cursor: pointer; font-size: 13px; background: #fff;
+}
+.decide-opt b { display: block; margin-bottom: 2px; font-size: 14px; }
+.decide-opt.on { border-color: var(--sage); background: var(--sage-soft); }
+.decide-opt.on.bad { border-color: var(--danger); background: var(--danger-soft); }

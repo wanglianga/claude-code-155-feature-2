@@ -64,7 +64,7 @@ export interface CoursePackage {
   usedSessions: number
   startDate: string
   expiryDate: string
-  status: '进行中' | '已用完' | '已过期' | '已续费衔接'
+  status: '进行中' | '已用完' | '已过期' | '已续费衔接' | '已退课' | '已转团课'
   leaveRule: LeaveRule
   createdAt: string
 }
@@ -202,4 +202,67 @@ export interface CoachProfile {
   gender: '女' | '男'
   specialties: string[]      // 理疗瑜伽/体态矫正/力量流/阴瑜伽...
   bio: string
+}
+
+// ---------------- 转教练交接（顾问发起 → 新教练确认 → 试运行 → 顾问决定） ----------------
+export type TransferStatus =
+  | '待新教练确认'   // 顾问已整理交接资料并发起，等新教练阅读确认
+  | '试运行中'       // 新教练已确认接手，等待第一节课与适配反馈
+  | '待顾问决定'     // 首课适配反馈已提交，等顾问决定是否稳定转入
+  | '已稳定转入'     // 顾问确认稳定转入，流程完结
+  | '已结束-不适配'  // 试运行仍不适配，按退课/转团课/换目标方案处理完毕
+
+export type TransferDecision = '稳定转入' | '退课' | '转团课' | '换目标方案'
+
+// 试运行期间会员满意度打卡（可多次，顾问跟踪）
+export interface TransferSatisfaction {
+  id: string
+  at: string
+  score: number            // 1-5
+  note: string
+}
+
+// 双方沟通记录（顾问/教练/会员三方留言，流程结束后保留）
+export interface TransferNote {
+  id: string
+  at: string
+  byRole: Role
+  byName: string
+  content: string
+}
+
+export interface CoachTransfer {
+  id: string
+  memberId: string
+  fromCoachId: string
+  toCoachId: string
+  consultantId: string
+  ticketId?: string        // 关联的「更换教练」工单（如有）
+  createdAt: string
+  // —— 顾问发起时整理的交接资料 ——
+  reason: string           // 转教练原因（会员诉求/投诉原因）
+  goals: string[]          // 训练目标
+  preference: string       // 会员偏好（教练性别/风格/时段等）
+  complaintSummary: string // 投诉与不适原因摘要
+  handoverNote: string     // 顾问补充的交接说明
+  status: TransferStatus
+  // —— 新教练阅读并确认 ——
+  coachConfirmedAt?: string
+  coachConfirmNote?: string
+  // —— 试运行：第一节课结束后的适配反馈（新教练填写） ——
+  firstSessionId?: string  // 接手后的第一节课
+  adaptFeedback?: {
+    at: string
+    fitness: '适配' | '基本适配' | '不适配'
+    note: string
+  }
+  // —— 试运行期间会员满意度（会员打卡，顾问跟踪） ——
+  satisfactions: TransferSatisfaction[]
+  // —— 顾问最终决定 ——
+  decision?: {
+    at: string
+    result: TransferDecision
+    note: string
+  }
+  notes: TransferNote[]    // 双方沟通记录
 }

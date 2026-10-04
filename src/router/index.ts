@@ -14,6 +14,10 @@ const ConsultantDashboard = () => import('../views/consultant/ConsultantDashboar
 const ArrangeExperience = () => import('../views/consultant/ArrangeExperience.vue')
 const TicketsBoard = () => import('../views/consultant/TicketsBoard.vue')
 const Member360 = () => import('../views/consultant/Member360.vue')
+const TransferList = () => import('../views/consultant/TransferList.vue')
+const TransferCreate = () => import('../views/consultant/TransferCreate.vue')
+const TransferDetail = () => import('../views/consultant/TransferDetail.vue')
+const CoachTransfer = () => import('../views/coach/CoachTransfer.vue')
 
 export const router = createRouter({
   history: createWebHashHistory(),
@@ -27,10 +31,14 @@ export const router = createRouter({
     { path: '/coach/member/:id', component: CoachMember, meta: { role: 'coach' } },
     { path: '/coach/session/:id', component: SessionRecord, meta: { role: 'coach' } },
     { path: '/coach/assess/:bookingId', component: AssessmentForm, meta: { role: 'coach' } },
+    { path: '/coach/transfer/:id', component: CoachTransfer, meta: { role: 'coach' } },
     { path: '/consultant', component: ConsultantDashboard, meta: { role: 'consultant' } },
     { path: '/consultant/arrange', component: ArrangeExperience, meta: { role: 'consultant' } },
     { path: '/consultant/tickets', component: TicketsBoard, meta: { role: 'consultant' } },
     { path: '/consultant/member/:id', component: Member360, meta: { role: 'consultant' } },
+    { path: '/consultant/transfers', component: TransferList, meta: { role: 'consultant' } },
+    { path: '/consultant/transfer/new/:memberId', component: TransferCreate, meta: { role: 'consultant' } },
+    { path: '/consultant/transfer/:id', component: TransferDetail, meta: { role: 'consultant' } },
     { path: '/:pathMatch(.*)*', redirect: '/login' },
   ],
 })

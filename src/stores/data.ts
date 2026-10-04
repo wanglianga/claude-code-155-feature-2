@@ -1,8 +1,8 @@
 import { defineStore } from 'pinia'
 import type {
-  Account, Assessment, CoachProfile, Complaint, CoursePackage, ExperienceBooking,
+  Account, Assessment, CoachProfile, CoachTransfer, Complaint, CoursePackage, ExperienceBooking,
   LeaveRequest, PainChange, RenewalFollowUp, SchedulePlan, Session, SessionRecord,
-  Ticket, TicketType, TimelineEvent, TimelineKind,
+  Ticket, TicketType, TimelineEvent, TimelineKind, TransferDecision,
 } from '../types'
 import { buildSeed, SEED_VERSION, type SeedState } from '../data/seed'
 import { addDays, daysBetween, nextWeekday, nowStr, today, uid, weekdayCn } from '../utils/date'
@@ -10,6 +10,9 @@ import { addDays, daysBetween, nextWeekday, nowStr, today, uid, weekdayCn } from
 const KEY = `yoga_db_v${SEED_VERSION}`
 
 export interface WeekdaySlot { weekday: number; time: string }
+
+/** 转教练流程的终态 */
+const TRANSFER_DONE: CoachTransfer['status'][] = ['已稳定转入', '已结束-不适配']
 
 export const useDataStore = defineStore('data', {
   state: (): SeedState => buildSeed(),
@@ -101,6 +104,24 @@ export const useDataStore = defineStore('data', {
         upcoming: ss.filter(x => x.status === '待上课').length,
       }
     },
+
+    // ---- 转教练交接 ----
+    transferById: (s) => (id: string): CoachTransfer | undefined => s.transfers.find(t => t.id === id),
+
+    transfersOf: (s) => (memberId: string) =>
+      s.transfers.filter(t => t.memberId === memberId).sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
+
+    /** 会员当前进行中的转教练流程（非终态） */
+    activeTransferOf(): (memberId: string) => CoachTransfer | undefined {
+      return (memberId) => this.transfersOf(memberId).find(t => !TRANSFER_DONE.includes(t.status))
+    },
+
+    /** 顾问看板：进行中的转教练流程 */
+    openTransfers: (s) => s.transfers.filter(t => !TRANSFER_DONE.includes(t.status)),
+
+    /** 教练收件箱：需要我确认 / 试运行中需要我反馈的交接 */
+    coachTransferInbox: (s) => (coachId: string) =>
+      s.transfers.filter(t => t.toCoachId === coachId && !TRANSFER_DONE.includes(t.status)),
   },
 
   actions: {
@@ -310,20 +331,117 @@ export const useDataStore = defineStore('data', {
       this.persist()
     },
 
-    // ---------- 顾问：换教练（训练记录完整交接，不从零开始） ----------
-    assignNewCoach(ticketId: string, newCoachId: string, consultantName: string) {
-      const tk = this.tickets.find(t => t.id === ticketId)
-      if (!tk || tk.type !== '更换教练') return
-      const pkg = this.activePackage(tk.memberId)
-      const oldCoach = pkg ? this.coachById(pkg.coachId)?.name : ''
-      const nc = this.coachById(newCoachId)
-      if (pkg) pkg.coachId = newCoachId
-      this.plans.filter(p => p.memberId === tk.memberId && p.active).forEach(p => { p.coachId = newCoachId })
-      this.sessions.filter(s => s.memberId === tk.memberId && s.status === '待上课').forEach(s => { s.coachId = newCoachId })
-      tk.status = '已解决'
-      tk.resolution = `已由${oldCoach}更换为${nc?.name}；历史测评、${this.recordsOf(tk.memberId).length} 条课后记录与疼痛趋势完整交接，新教练从既有计划继续。`
-      this.log(tk.memberId, '更换教练', 'consultant', consultantName, '完成换教练',
-        tk.resolution)
+    // ---------- 转教练交接：顾问发起（整理交接资料，训练记录不从零开始） ----------
+    startTransfer(
+      memberId: string,
+      toCoachId: string,
+      payload: { reason: string; goals: string[]; preference: string; complaintSummary: string; handoverNote: string },
+      consultantId: string,
+      consultantName: string,
+      ticketId?: string,
+    ): string | undefined {
+      const pkg = this.activePackage(memberId)
+      if (!pkg) return undefined
+      if (this.activeTransferOf(memberId)) return undefined
+      const fromCoachId = pkg.coachId
+      const tr: CoachTransfer = {
+        id: uid('tr'), memberId, fromCoachId, toCoachId, consultantId, ticketId,
+        createdAt: nowStr(), ...payload, status: '待新教练确认',
+        satisfactions: [], notes: [],
+      }
+      this.transfers.unshift(tr)
+      if (ticketId) {
+        const tk = this.tickets.find(t => t.id === ticketId)
+        if (tk && tk.status === '待处理') tk.status = '处理中'
+      }
+      this.log(memberId, '更换教练', 'consultant', consultantName, '发起转教练交接',
+        `整理训练目标、${this.recordsOf(memberId).length} 条课后记录、疼痛变化与会员偏好，发起转教练流程：${this.coachById(fromCoachId)?.name} → ${this.coachById(toCoachId)?.name}；待新教练阅读确认。`)
+      this.persist()
+      return tr.id
+    },
+
+    // ---------- 转教练交接：新教练阅读并确认 → 进入试运行（课程随之交接） ----------
+    confirmTransfer(transferId: string, coachId: string, note: string, coachName: string) {
+      const tr = this.transfers.find(t => t.id === transferId)
+      if (!tr || tr.status !== '待新教练确认' || tr.toCoachId !== coachId) return
+      tr.status = '试运行中'
+      tr.coachConfirmedAt = nowStr()
+      tr.coachConfirmNote = note
+      // 课包、排课计划与待上课程交接给新教练（历史测评与课后记录本就共享，不从零开始）
+      const pkg = this.activePackage(tr.memberId)
+      if (pkg) pkg.coachId = tr.toCoachId
+      this.plans.filter(p => p.memberId === tr.memberId && p.active).forEach(p => { p.coachId = tr.toCoachId })
+      const upcoming = this.sessions
+        .filter(s => s.memberId === tr.memberId && s.status === '待上课')
+        .sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time))
+      upcoming.forEach(s => { s.coachId = tr.toCoachId })
+      tr.firstSessionId = upcoming[0]?.id
+      const first = upcoming[0]
+      if (first && ['待上节课反馈后确定', '待换教练处理结果确定'].includes(first.focus)) {
+        first.focus = '转教练试运行首课：相互适应与目标对齐'
+      }
+      this.log(tr.memberId, '更换教练', 'coach', coachName, '新教练确认接手',
+        `已阅读交接记录（训练目标 / 课后记录 / 疼痛趋势 / 会员偏好），确认接手，进入试运行。${note ? `确认备注：${note}` : ''}`)
+      this.persist()
+    },
+
+    // ---------- 转教练交接：新教练提交首课适配反馈 → 待顾问决定 ----------
+    submitAdaptFeedback(transferId: string, fitness: '适配' | '基本适配' | '不适配', note: string, coachName: string) {
+      const tr = this.transfers.find(t => t.id === transferId)
+      if (!tr || tr.status !== '试运行中') return
+      tr.adaptFeedback = { at: nowStr(), fitness, note }
+      tr.status = '待顾问决定'
+      this.log(tr.memberId, '更换教练', 'coach', coachName, '首课适配反馈',
+        `适配结论：${fitness}。${note}`, true)
+      this.persist()
+    },
+
+    // ---------- 转教练交接：会员试运行满意度打卡（可多次，顾问跟踪） ----------
+    submitSatisfaction(transferId: string, score: number, note: string, memberName: string) {
+      const tr = this.transfers.find(t => t.id === transferId)
+      if (!tr || (tr.status !== '试运行中' && tr.status !== '待顾问决定')) return
+      tr.satisfactions.unshift({ id: uid('sf'), at: nowStr(), score, note })
+      this.log(tr.memberId, '更换教练', 'member', memberName, '试运行满意度反馈', `对新教练满意度 ${score}/5。${note}`)
+      this.persist()
+    },
+
+    // ---------- 转教练交接：双方沟通记录（顾问/教练/会员均可留言，流程结束后保留） ----------
+    addTransferNote(transferId: string, byRole: 'member' | 'consultant' | 'coach', byId: string, content: string) {
+      const tr = this.transfers.find(t => t.id === transferId)
+      if (!tr) return
+      tr.notes.push({ id: uid('tn'), at: nowStr(), byRole, byName: this.nameOf(byId), content })
+      this.persist()
+    },
+
+    // ---------- 转教练交接：顾问决定（稳定转入 / 退课 / 转团课 / 换目标方案） ----------
+    decideTransfer(transferId: string, result: TransferDecision, note: string, consultantName: string) {
+      const tr = this.transfers.find(t => t.id === transferId)
+      if (!tr || (tr.status !== '试运行中' && tr.status !== '待顾问决定')) return
+      tr.decision = { at: nowStr(), result, note }
+      const pkg = this.activePackage(tr.memberId)
+      if (result === '稳定转入') {
+        tr.status = '已稳定转入'
+      } else {
+        tr.status = '已结束-不适配'
+        if (result === '退课' || result === '转团课') {
+          // 结束私教课包：剩余待上课程取消、排课计划停用
+          if (pkg) pkg.status = result === '退课' ? '已退课' : '已转团课'
+          this.sessions.filter(s => s.memberId === tr.memberId && s.status === '待上课').forEach(s => { s.status = '已取消' })
+          this.plans.filter(p => p.memberId === tr.memberId).forEach(p => { p.active = false })
+        }
+        // 换目标方案：课包继续，由顾问在结论中写明新的目标方案并与会员、教练重新对齐
+      }
+      // 关联的「更换教练」工单随流程完结
+      if (tr.ticketId) {
+        const tk = this.tickets.find(t => t.id === tr.ticketId)
+        if (tk && tk.status !== '已解决') {
+          tk.status = '已解决'
+          tk.resolution = `转教练流程完结：${result}。${note}`
+        }
+      }
+      this.log(tr.memberId, '更换教练', 'consultant', consultantName,
+        result === '稳定转入' ? '转教练稳定转入' : `转教练不适配处理：${result}`,
+        `${note}（交接沟通记录 ${tr.notes.length} 条已保留）`)
       this.persist()
     },
 
