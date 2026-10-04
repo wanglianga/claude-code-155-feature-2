@@ -64,7 +64,7 @@ export interface CoursePackage {
   usedSessions: number
   startDate: string
   expiryDate: string
-  status: '进行中' | '已用完' | '已过期' | '已续费衔接'
+  status: '进行中' | '已用完' | '已过期' | '已续费衔接' | '已退课' | '已转团课'
   leaveRule: LeaveRule
   createdAt: string
 }
@@ -177,11 +177,88 @@ export interface Complaint {
   reply: string
 }
 
+// ---------------- 转教练换教练交接（结构化试运行流程） ----------------
+export type TransferStatus =
+  | '待新教练确认'   // 顾问已发起并整理交接记录，等待新教练需阅读并确认
+  | '试运行中'       // 新教练已确认接手，首节试课与试运行跟踪进行中
+  | '待顾问定夺'     // 首课适配反馈已提交，等待顾问决定是否稳定转入
+  | '已稳定转入'     // 顾问确认稳定转入，流程完成
+  | '已终止'         // 仍不适配：退课 / 转团课 / 换目标方案 / 回原教练
+
+/** 发起交接时由系统整理的交接快照（冻结保存，不随后续数据变化） */
+export interface HandoverSnapshot {
+  goals: string            // 训练目标（含备注）
+  completedCount: number   // 已完成课程数
+  totalCount: number       // 课包总节数
+  recentCourses: string[]  // 最近课程摘要（重点 + 体感 + 疼痛）
+  painSummary: string      // 疼痛变化趋势
+  preferences: string      // 会员偏好（性别倾向 / 可上课时间 / 预算 / 风格诉求）
+  complaintReason: string  // 投诉与换教练原因
+}
+
+/** 试运行期间顾问的跟踪记录：会员满意度 + 新教练反馈 */
+export interface TransferCheckIn {
+  id: string
+  at: string
+  by: string               // 顾问姓名
+  satisfaction: number     // 会员满意度 1-10
+  coachNote: string        // 新教练反馈摘要
+  note: string             // 顾问跟踪备注
+}
+
+/** 新教练第一节课结束后的适配反馈 */
+export interface TransferFeedback {
+  at: string
+  adaptation: number       // 适配度评分 1-10
+  memberReaction: string   // 会员课堂反应
+  plan: string             // 后续计划建议
+  recommend: '建议转入' | '建议观察' | '建议终止'
+}
+
+/** 双方沟通记录（会员 / 新教练 / 顾问同一条线程） */
+export interface TransferMessage {
+  id: string
+  at: string
+  fromRole: Role
+  fromName: string
+  content: string
+}
+
+export interface CoachTransfer {
+  id: string
+  memberId: string
+  fromCoachId: string
+  toCoachId: string
+  ticketId?: string          // 关联的「更换教练」工单
+  createdAt: string
+  createdBy: string          // 发起顾问姓名
+  reason: string             // 顾问整理的转教练原因
+  snapshot: HandoverSnapshot // 交接快照
+  status: TransferStatus
+  // 新教练确认
+  confirmedAt?: string
+  confirmNote?: string       // 新教练确认时填写的接手计划
+  // 第一节课适配反馈
+  firstSessionId?: string
+  feedback?: TransferFeedback
+  // 试运行跟踪
+  checkIns: TransferCheckIn[]
+  // 双方沟通记录
+  messages: TransferMessage[]
+  // 顾问定夺
+  decision?: {
+    at: string
+    by: string
+    result: '稳定转入' | '退课' | '转团课' | '换目标方案' | '回原教练'
+    note: string
+  }
+}
+
 // ---------------- 统一训练时间线（三方共享的同一套记录） ----------------
 export type TimelineKind =
   | '预约体验' | '安排体验' | '体验测评' | '购课' | '排课'
   | '上课记录' | '请假' | '改期' | '不适上报' | '课程调整'
-  | '更换教练' | '续费' | '投诉' | '工单处理'
+  | '更换教练' | '转教练交接' | '续费' | '投诉' | '工单处理'
 
 export interface TimelineEvent {
   id: string

@@ -19,6 +19,14 @@ const behindMembers = computed(() =>
     .map(p => ({ pkg: p, prog: data.progressOf(p) }))
 )
 
+// 转教练试运行跟踪
+const activeTransfers = computed(() =>
+  data.transfers.filter(t => t.status !== '已稳定转入' && t.status !== '已终止')
+)
+const transferStatusClass: Record<string, string> = {
+  待新教练确认: 'amber', 试运行中: 'clay', 待顾问定夺: 'danger',
+}
+
 function sessionLabel(sessionId: string) {
   const s = data.sessions.find(x => x.id === sessionId)
   return s ? `${s.date} ${s.time}（${data.nameOf(s.memberId)}）` : ''
@@ -110,6 +118,32 @@ function decideLeave(id: string, ok: boolean) {
         </div>
         <div v-if="!complaints.length" class="empty">暂无投诉</div>
       </div>
+    </div>
+
+    <!-- 转教练试运行 -->
+    <div class="card">
+      <div class="between">
+        <h3 style="margin: 0">转教练试运行（{{ activeTransfers.length }}）</h3>
+        <router-link to="/consultant/transfers"><button class="small ghost">交接管理 →</button></router-link>
+      </div>
+      <table v-if="activeTransfers.length" class="plain mt8">
+        <thead><tr><th>会员</th><th>教练变更</th><th>状态</th><th>最近满意度</th><th>新教练反馈</th></tr></thead>
+        <tbody>
+          <tr v-for="t in activeTransfers" :key="t.id">
+            <td><b>{{ data.nameOf(t.memberId) }}</b></td>
+            <td>{{ data.coachById(t.fromCoachId)?.name }} → {{ data.coachById(t.toCoachId)?.name }}</td>
+            <td><span class="tag" :class="transferStatusClass[t.status]">{{ t.status }}</span></td>
+            <td>
+              <span v-if="t.checkIns.length" class="tag" :class="t.checkIns[t.checkIns.length - 1].satisfaction <= 5 ? 'danger' : ''">
+                {{ t.checkIns[t.checkIns.length - 1].satisfaction }}/10
+              </span>
+              <span v-else class="muted">未跟踪</span>
+            </td>
+            <td class="muted">{{ t.feedback ? `适配度 ${t.feedback.adaptation}/10 · ${t.feedback.recommend}` : '待首课反馈' }}</td>
+          </tr>
+        </tbody>
+      </table>
+      <div v-else class="empty">暂无进行中的转教练交接</div>
     </div>
 
     <!-- 异常工单 -->

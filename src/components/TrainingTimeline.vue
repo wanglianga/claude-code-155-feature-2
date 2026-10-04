@@ -13,7 +13,7 @@ const events = computed(() => {
 const kindColor: Record<string, string> = {
   预约体验: 'gray', 安排体验: 'gray', 购课: '', 排课: 'gray',
   上课记录: '', 请假: 'amber', 改期: 'amber', 不适上报: 'danger',
-  课程调整: 'clay', 更换教练: 'clay', 续费: '', 投诉: 'danger', 工单处理: 'gray', 体验测评: 'clay',
+  课程调整: 'clay', 更换教练: 'clay', 转教练交接: 'clay', 续费: '', 投诉: 'danger', 工单处理: 'gray', 体验测评: 'clay',
 }
 </script>
 

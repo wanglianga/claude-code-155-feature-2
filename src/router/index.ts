@@ -8,11 +8,13 @@ const MemberRecords = () => import('../views/member/MemberRecords.vue')
 const MemberRequests = () => import('../views/member/MemberRequests.vue')
 const CoachWeek = () => import('../views/coach/CoachWeek.vue')
 const CoachMember = () => import('../views/coach/CoachMember.vue')
+const CoachTransfers = () => import('../views/coach/CoachTransfers.vue')
 const SessionRecord = () => import('../views/coach/SessionRecord.vue')
 const AssessmentForm = () => import('../views/coach/AssessmentForm.vue')
 const ConsultantDashboard = () => import('../views/consultant/ConsultantDashboard.vue')
 const ArrangeExperience = () => import('../views/consultant/ArrangeExperience.vue')
 const TicketsBoard = () => import('../views/consultant/TicketsBoard.vue')
+const TransferBoard = () => import('../views/consultant/TransferBoard.vue')
 const Member360 = () => import('../views/consultant/Member360.vue')
 
 export const router = createRouter({
@@ -24,12 +26,14 @@ export const router = createRouter({
     { path: '/member/records', component: MemberRecords, meta: { role: 'member' } },
     { path: '/member/requests', component: MemberRequests, meta: { role: 'member' } },
     { path: '/coach', component: CoachWeek, meta: { role: 'coach' } },
+    { path: '/coach/transfers', component: CoachTransfers, meta: { role: 'coach' } },
     { path: '/coach/member/:id', component: CoachMember, meta: { role: 'coach' } },
     { path: '/coach/session/:id', component: SessionRecord, meta: { role: 'coach' } },
     { path: '/coach/assess/:bookingId', component: AssessmentForm, meta: { role: 'coach' } },
     { path: '/consultant', component: ConsultantDashboard, meta: { role: 'consultant' } },
     { path: '/consultant/arrange', component: ArrangeExperience, meta: { role: 'consultant' } },
     { path: '/consultant/tickets', component: TicketsBoard, meta: { role: 'consultant' } },
+    { path: '/consultant/transfers', component: TransferBoard, meta: { role: 'consultant' } },
     { path: '/consultant/member/:id', component: Member360, meta: { role: 'consultant' } },
     { path: '/:pathMatch(.*)*', redirect: '/login' },
   ],

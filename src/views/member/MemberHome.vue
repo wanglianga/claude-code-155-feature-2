@@ -36,6 +36,31 @@ function confirmPurchase() {
 }
 
 const expSession = computed(() => upcoming.value.find(s => s.isExperience))
+
+// ---- 转教练交接进度 ----
+const transfer = computed(() => data.activeTransferOf(mid))
+const lastTransfer = computed(() => data.transfersOf(mid)[0])
+const shownTransfer = computed(() => transfer.value ?? (lastTransfer.value?.decision ? lastTransfer.value : undefined))
+const transferMsg = ref('')
+const transferSteps = ['发起交接', '新教练确认', '首节试课', '适配反馈', '顾问定夺']
+function transferStep(): number {
+  const t = transfer.value
+  if (!t) return 5
+  if (t.status === '待新教练确认') return 1
+  if (t.status === '试运行中') {
+    const first = t.firstSessionId ? data.sessions.find(s => s.id === t.firstSessionId) : undefined
+    return first?.status === '已完成' ? 3 : 2
+  }
+  if (t.status === '待顾问定夺') return 4
+  return 5
+}
+function postTransferMsg() {
+  const c = transferMsg.value.trim()
+  if (!c || !shownTransfer.value) return
+  data.postTransferMessage(shownTransfer.value.id, 'member', auth.current!.name, c)
+  transferMsg.value = ''
+}
+const roleLabel: Record<string, string> = { member: '会员', coach: '教练', consultant: '顾问' }
 </script>
 
 <template>
@@ -91,6 +116,34 @@ const expSession = computed(() => upcoming.value.find(s => s.isExperience))
           <button @click="confirmPurchase">确认购买并生成排课</button>
           <button class="ghost" @click="showPurchase = false">再想想</button>
         </div>
+      </div>
+    </div>
+
+    <!-- 转教练交接进度 -->
+    <div v-if="shownTransfer" class="card">
+      <div class="between">
+        <h3 style="margin: 0">转教练进度 <span class="tag clay">{{ shownTransfer.status }}</span></h3>
+        <span class="muted">{{ data.coachById(shownTransfer.fromCoachId)?.name }} → {{ data.coachById(shownTransfer.toCoachId)?.name }}</span>
+      </div>
+      <div class="steps mt8 mb8">
+        <span v-for="(s, i) in transferSteps" :key="s" class="step" :class="{ done: i < transferStep(), now: i === transferStep() - 1 && !['已稳定转入', '已终止'].includes(shownTransfer.status) }">{{ s }}</span>
+      </div>
+      <p class="muted" style="margin: 4px 0">
+        <template v-if="shownTransfer.status === '待新教练确认'">顾问已为你整理训练目标、已完成课程、疼痛变化与偏好，等待 {{ data.coachById(shownTransfer.toCoachId)?.name }} 教练阅读确认。</template>
+        <template v-else-if="shownTransfer.status === '试运行中'">{{ data.coachById(shownTransfer.toCoachId)?.name }} 教练已确认接手，首节试课进行中，顾问会跟踪你的满意度。</template>
+        <template v-else-if="shownTransfer.status === '待顾问定夺'">首节试课反馈已提交，顾问正在评估是否稳定转入。</template>
+        <template v-else-if="shownTransfer.decision">已定夺：{{ shownTransfer.decision.result }} —— {{ shownTransfer.decision.note }}</template>
+      </p>
+      <div v-if="shownTransfer.messages.length" class="mt8">
+        <div v-for="m in shownTransfer.messages" :key="m.id" class="mb8" style="font-size: 13px">
+          <span class="tag" :class="m.fromRole === 'member' ? 'amber' : m.fromRole === 'coach' ? 'clay' : ''">{{ m.fromName }} · {{ roleLabel[m.fromRole] }}</span>
+          <span class="muted">{{ m.at }}</span>
+          <div>{{ m.content }}</div>
+        </div>
+      </div>
+      <div class="row mt8">
+        <input v-model="transferMsg" placeholder="给顾问或新教练留言（双方沟通记录会保留）" style="flex: 1" @keyup.enter="postTransferMsg" />
+        <button class="small" @click="postTransferMsg">发送</button>
       </div>
     </div>
 

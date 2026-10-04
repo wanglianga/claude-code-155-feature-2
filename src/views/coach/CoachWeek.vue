@@ -27,6 +27,9 @@ const weekDays = computed(() => {
 
 const mySessions = computed(() => data.coachSessions(coachId))
 
+// 待我确认的转教练交接
+const pendingTransfers = computed(() => data.pendingTransferConfirms(coachId))
+
 function sessionsOn(date: string): Session[] {
   return mySessions.value.filter(s => s.date === date)
 }
@@ -75,6 +78,11 @@ const statusClass: Record<string, string> = { 待上课: '', 已完成: 'off', �
         <button class="ghost small" @click="weekOffset = 0">本周</button>
         <button class="ghost small" @click="weekOffset++">下一周 →</button>
       </div>
+    </div>
+
+    <div v-if="pendingTransfers.length" class="banner warn">
+      📥 你有 {{ pendingTransfers.length }} 份转教练交接待确认（{{ pendingTransfers.map(t => data.nameOf(t.memberId)).join('、') }}）。
+      <router-link to="/coach/transfers"><button class="small">去阅读交接记录 →</button></router-link>
     </div>
 
     <div class="week-grid">

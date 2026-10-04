@@ -18,13 +18,17 @@ const navs = computed(() => {
     ]
   }
   if (auth.role === 'coach') {
-    return [{ to: '/coach', label: '本周课表' }]
+    return [
+      { to: '/coach', label: '本周课表' },
+      { to: '/coach/transfers', label: '交接任务' },
+    ]
   }
   if (auth.role === 'consultant') {
     return [
       { to: '/consultant', label: '经营看板' },
       { to: '/consultant/arrange', label: '安排体验课' },
       { to: '/consultant/tickets', label: '异常工单' },
+      { to: '/consultant/transfers', label: '转教练交接' },
     ]
   }
   return []

@@ -20,6 +20,7 @@ const trend = computed(() => data.painTrend(mid))
 const attendance = computed(() => data.attendanceOf(mid))
 const renewals = computed(() => data.renewals.filter(r => r.memberId === mid))
 const complaints = computed(() => data.complaints.filter(c => c.memberId === mid && c.status !== '已关闭'))
+const activeTransfer = computed(() => data.activeTransferOf(mid))
 
 const follow = reactive({ summary: '', result: '跟进中' as '跟进中' | '已续费' | '暂缓' })
 const renewSpec = reactive({ name: '私教 24 节 · 进阶周期', totalSessions: 24, validDays: 120, weekday: 2, time: '19:00-20:00' })
@@ -79,8 +80,18 @@ function reply(cId: string) {
     </div>
 
     <div class="card" v-if="pkg">
-      <h3>当前课包</h3>
-      <PackageCard :pkg="pkg" />
+      <div class="between">
+        <h3 style="margin: 0">当前课包</h3>
+        <router-link v-if="!activeTransfer" :to="`/consultant/transfers?memberId=${mid}`">
+          <button class="small ghost">发起转教练交接 →</button>
+        </router-link>
+      </div>
+      <div class="mt8"><PackageCard :pkg="pkg" /></div>
+    </div>
+
+    <div v-if="activeTransfer" class="banner warn">
+      🔄 转教练交接进行中（{{ activeTransfer.status }}）：{{ data.coachById(activeTransfer.fromCoachId)?.name }} → {{ data.coachById(activeTransfer.toCoachId)?.name }}。
+      <router-link to="/consultant/transfers"><button class="small">去交接页跟踪 →</button></router-link>
     </div>
 
     <div class="grid cols-2">
